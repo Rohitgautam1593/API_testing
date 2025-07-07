@@ -141,47 +141,61 @@
                 if (routeLine) {
                     map.removeLayer(routeLine);
                 }
-                
-                // Get road route
-                const response = await fetch(`/api/route?from_lat=${nurseLat}&from_lng=${nurseLon}&to_lat=${patientCoords[0]}&to_lng=${patientCoords[1]}`);
-                const routeData = await response.json();
-                
-                if (routeData.geometry && routeData.geometry.coordinates) {
-                    // Convert coordinates to [lat, lng] format for Leaflet
-                    const pathCoordinates = routeData.geometry.coordinates.map(coord => [coord[1], coord[0]]);
-                    
-                    routeLine = L.polyline(pathCoordinates, {
-                        color: '#00ff00',
+                // Try real road route first
+                let response = await fetch(`/api/realroute?from_lat=${nurseLat}&from_lng=${nurseLon}&to_lat=${patientCoords[0]}&to_lng=${patientCoords[1]}`);
+                let routeData = await response.json();
+                if (routeData && routeData.features && routeData.features[0]) {
+                    const coords = routeData.features[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+                    routeLine = L.polyline(coords, {
+                        color: '#0074D9',
                         weight: 6,
-                        opacity: 0.8,
-                        dashArray: '10, 10'
+                        opacity: 0.9
                     }).addTo(map);
-                    
-                    // Add glow effect
-                    const pathElement = routeLine.getElement();
-                    if (pathElement) {
-                        pathElement.style.filter = 'drop-shadow(0 0 8px #00ff00)';
-                    }
-                    
-                    // Update distance with road distance
-                    const roadDistance = (routeData.distance / 1000).toFixed(2);
+                    // Update distance with real road distance
+                    const roadDistance = (routeData.features[0].properties.summary.distance / 1000).toFixed(2);
                     document.getElementById('distanceToPatient').textContent = `${roadDistance} km (Road)`;
+                    return;
                 }
+                // If no real route, fallback
+                throw new Error('No real route');
             } catch (error) {
-                console.error('Error fetching route:', error);
-                // Fallback to straight line
-                if (routeLine) {
-                    map.removeLayer(routeLine);
+                // Fallback to simulated road route
+                try {
+                    let response = await fetch(`/api/route?from_lat=${nurseLat}&from_lng=${nurseLon}&to_lat=${patientCoords[0]}&to_lng=${patientCoords[1]}`);
+                    let routeData = await response.json();
+                    if (routeData.geometry && routeData.geometry.coordinates) {
+                        const pathCoordinates = routeData.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+                        routeLine = L.polyline(pathCoordinates, {
+                            color: '#00ff00',
+                            weight: 6,
+                            opacity: 0.8,
+                            dashArray: '10, 10'
+                        }).addTo(map);
+                        // Add glow effect
+                        const pathElement = routeLine.getElement();
+                        if (pathElement) {
+                            pathElement.style.filter = 'drop-shadow(0 0 8px #00ff00)';
+                        }
+                        // Update distance with road distance
+                        const roadDistance = (routeData.distance / 1000).toFixed(2);
+                        document.getElementById('distanceToPatient').textContent = `${roadDistance} km (Simulated Road)`;
+                        return;
+                    }
+                } catch (fallbackError) {
+                    // Fallback to straight line
+                    if (routeLine) {
+                        map.removeLayer(routeLine);
+                    }
+                    routeLine = L.polyline([
+                        [nurseLat, nurseLon],
+                        [patientCoords[0], patientCoords[1]]
+                    ], {
+                        color: '#ff6b6b',
+                        weight: 4,
+                        opacity: 0.6,
+                        dashArray: '5, 5'
+                    }).addTo(map);
                 }
-                routeLine = L.polyline([
-                    [nurseLat, nurseLon],
-                    [patientCoords[0], patientCoords[1]]
-                ], {
-                    color: '#ff6b6b',
-                    weight: 4,
-                    opacity: 0.6,
-                    dashArray: '5, 5'
-                }).addTo(map);
             }
         }
         

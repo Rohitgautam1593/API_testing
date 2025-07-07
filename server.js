@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -79,6 +80,30 @@ app.get('/api/route', (req, res) => {
         },
         steps: []
     });
+});
+
+// Real road routing API using OpenRouteService
+app.get('/api/realroute', async (req, res) => {
+    const { from_lat, from_lng, to_lat, to_lng } = req.query;
+    const ORS_API_KEY = process.env.ORS_API_KEY || 'PASTE_YOUR_ORS_API_KEY_HERE';
+    if (!from_lat || !from_lng || !to_lat || !to_lng) {
+        return res.status(400).json({ error: 'Missing coordinates' });
+    }
+    try {
+        const orsUrl = `https://api.openrouteservice.org/v2/directions/driving-car/geojson`;
+        const response = await axios.get(orsUrl, {
+            params: {
+                start: `${from_lng},${from_lat}`,
+                end: `${to_lng},${to_lat}`
+            },
+            headers: {
+                'Authorization': ORS_API_KEY
+            }
+        });
+        res.json(response.data);
+    } catch (error) {
+        res.status(500).json({ error: 'Routing failed', details: error.message });
+    }
 });
 
 // Serve HTML pages
