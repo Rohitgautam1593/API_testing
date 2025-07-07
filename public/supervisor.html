@@ -95,6 +95,13 @@
                 <p><strong>Supervisor:</strong> <span id="supervisorLocation">SRHU, Dehradun (30.3165, 78.0322)</span></p>
                 <p><strong>Patient:</strong> <span id="patientLocation">Rishikesh (30.0869, 78.2676)</span></p>
             </div>
+            
+            <div class="location-info">
+                <label for="nurseIdFilter"><strong>Track Nurse by ID:</strong></label>
+                <select id="nurseIdFilter" style="width:100%;padding:8px;margin-top:5px;margin-bottom:10px;border-radius:5px;border:1px solid #ccc;">
+                    <option value="all">All Nurses</option>
+                </select>
+            </div>
         </div>
     </div>
 
@@ -293,17 +300,28 @@
             return colors[Math.abs(hash) % colors.length];
         }
         
+        let nurseIdFilter = 'all';
+        const nurseIdFilterSelect = document.getElementById('nurseIdFilter');
+        nurseIdFilterSelect.addEventListener('change', function() {
+            nurseIdFilter = this.value;
+            updateAllNurseLocations();
+        });
+        
         async function updateAllNurseLocations() {
             try {
                 const response = await fetch('/get-location');
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const nurses = await response.json();
+                // Build nurse ID filter dropdown
+                const uniqueIds = Array.from(new Set(nurses.map(n => n.nurseId || 'Unknown')));
+                nurseIdFilterSelect.innerHTML = '<option value="all">All Nurses</option>' + uniqueIds.map(id => `<option value="${id}">${id}</option>`).join('');
                 // Remove old markers/routes
                 Object.values(nurseMarkers).forEach(m => map.removeLayer(m));
                 Object.values(nurseRoutes).forEach(r => map.removeLayer(r));
                 nurseMarkers = {};
                 nurseRoutes = {};
-                nurses.forEach((nurse, idx) => {
+                let filteredNurses = nurseIdFilter === 'all' ? nurses : nurses.filter(n => (n.nurseId || 'Unknown') === nurseIdFilter);
+                filteredNurses.forEach((nurse, idx) => {
                     const id = nurse.nurseId || `Nurse${idx+1}`;
                     // Marker
                     const color = getColorForNurse(id);
@@ -314,8 +332,21 @@
                     // Route
                     updateRouteForNurse(id, nurse.lat, nurse.lon, color);
                 });
-                document.getElementById('updateCount').textContent = nurses.length;
-                updateStatus(`Tracking ${nurses.length} nurse(s)`, 'success');
+                document.getElementById('updateCount').textContent = filteredNurses.length;
+                if (filteredNurses.length === 1) {
+                    const nurse = filteredNurses[0];
+                    document.getElementById('nurseLat').textContent = nurse.lat.toFixed(6);
+                    document.getElementById('nurseLon').textContent = nurse.lon.toFixed(6);
+                    document.getElementById('lastUpdate').textContent = new Date(nurse.timestamp).toLocaleTimeString();
+                    calculateDistances(nurse.lat, nurse.lon);
+                } else {
+                    document.getElementById('nurseLat').textContent = '--';
+                    document.getElementById('nurseLon').textContent = '--';
+                    document.getElementById('lastUpdate').textContent = '--';
+                    document.getElementById('distanceToPatient').textContent = '--';
+                    document.getElementById('distanceToSupervisor').textContent = '--';
+                }
+                updateStatus(`Tracking ${filteredNurses.length} nurse(s)`, 'success');
             } catch (error) {
                 updateStatus(`Error fetching nurse locations: ${error.message}`, 'error');
             }
