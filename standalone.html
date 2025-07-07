@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nurse Tracking System - Standalone Test</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .container {
+            display: flex;
+            height: calc(100vh - 100px);
+        }
+        
+        .nurse-panel {
+            flex: 1;
+            background: white;
+            padding: 20px;
+            overflow-y: auto;
+            border-right: 2px solid #e0e0e0;
+        }
+        
+        .supervisor-panel {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+        
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+        
+        .sidebar {
+            background: white;
+            padding: 20px;
+            border-top: 2px solid #e0e0e0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .status-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            border-left: 4px solid #4ecdc4;
+        }
+        
+        .status-card h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        
+        .info-item {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+        }
+        
+        .info-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .info-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 0;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: #4ecdc4;
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .patient-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-size: 16px;
+        }
+        
+        .legend {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 5px 0;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+        }
+        
+        .nurse-color { background: #ff6b6b; }
+        .supervisor-color { background: #4ecdc4; }
+        .patient-color { background: #feca57; }
+        
+        .simulation-controls {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .simulation-controls h4 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .control-group {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+            align-items: center;
+        }
+        
+        .control-group label {
+            min-width: 120px;
+            font-weight: bold;
+        }
+        
+        .control-group input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            .nurse-panel {
+                border-right: none;
+                border-bottom: 2px solid #e0e0e0;
+                max-height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏥 Nurse Tracking System - Standalone Test</h1>
+        <p>Real-time location tracking simulation (No Node.js required)</p>
+    </div>
+
+    <div class="container">
+        <!-- Nurse Panel -->
+        <div class="nurse-panel">
+            <h2>👩‍⚕️ Nurse Interface</h2>
+            
+            <div class="simulation-controls">
+                <h4>📍 Location Simulation</h4>
+                <div class="control-group">
+                    <label>Latitude:</label>
+                    <input type="number" id="simLat" value="40.7128" step="0.0001">
+                </div>
+                <div class="control-group">
+                    <label>Longitude:</label>
+                    <input type="number" id="simLng" value="-74.0060" step="0.0001">
+                </div>
+                <button class="btn btn-primary" id="updateLocation">Update Location</button>
+                <button class="btn btn-secondary" id="startSimulation">Start Auto Simulation</button>
+                <button class="btn btn-secondary" id="stopSimulation" disabled>Stop Simulation</button>
+            </div>
+
+            <div class="status-card">
+                <h3>📍 Current Location</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Latitude</div>
+                        <div class="info-value" id="nurseLat">40.7128</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Longitude</div>
+                        <div class="info-value" id="nurseLng">-74.0060</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Last Update</div>
+                        <div class="info-value" id="nurseLastUpdate">--</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Status</div>
+                        <div class="info-value" id="nurseStatus">Online</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="status-card">
+                <h3>🏠 Patient Destination</h3>
+                <input type="text" class="patient-input" id="patientAddress" 
+                       placeholder="Enter patient address" 
+                       value="123 Main St, New York, NY">
+                <button class="btn btn-secondary" id="updatePatient">Update Patient</button>
+            </div>
+
+            <div class="status-card">
+                <h3>📊 Distance Info</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">To Patient</div>
+                        <div class="info-value" id="distanceToPatient">--</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">To Supervisor</div>
+                        <div class="info-value" id="distanceToSupervisor">--</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Supervisor Panel -->
+        <div class="supervisor-panel">
+            <div class="map-container">
+                <div id="map"></div>
+                <div class="legend">
+                    <h4>Legend</h4>
+                    <div class="legend-item">
+                        <div class="legend-color nurse-color"></div>
+                        <span>Nurse</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color supervisor-color"></div>
+                        <span>Supervisor</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color patient-color"></div>
+                        <span>Patient</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="status-card">
+                    <h3>📏 Distance Calculations</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <div class="info-label">Nurse → Patient</div>
+                            <div class="info-value" id="supervisorDistanceToPatient">--</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Nurse → Supervisor</div>
+                            <div class="info-value" id="supervisorDistanceToSupervisor">--</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Travel Time</div>
+                            <div class="info-value" id="travelTime">--</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">ETA</div>
+                            <div class="info-value" id="eta">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="status-card">
+                    <h3>🏠 Patient Info</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <div class="info-label">Address</div>
+                            <div class="info-value" id="supervisorPatientAddress">123 Main St, NY</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Coordinates</div>
+                            <div class="info-value" id="supervisorPatientCoords">40.7505, -73.9934</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize map
+        let map, nurseMarker, supervisorMarker, patientMarker;
+        let simulationInterval;
+        let isSimulating = false;
+
+        // Default locations
+        let nurseLocation = { lat: 40.7128, lng: -74.0060 };
+        let supervisorLocation = { lat: 40.7589, lng: -73.9851 };
+        let patientLocation = { lat: 40.7505, lng: -73.9934, address: "123 Main St, New York, NY" };
+
+        function initMap() {
+            // Use OpenStreetMap tiles (free, no API key required)
+            map = L.map('map').setView([40.7589, -73.9851], 13);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 18
+            }).addTo(map);
+
+            // Add markers
+            nurseMarker = L.marker([nurseLocation.lat, nurseLocation.lng], {
+                icon: L.divIcon({
+                    className: 'nurse-marker',
+                    html: '👩‍⚕️',
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15]
+                })
+            }).addTo(map);
+
+            supervisorMarker = L.marker([supervisorLocation.lat, supervisorLocation.lng], {
+                icon: L.divIcon({
+                    className: 'supervisor-marker',
+                    html: '👨‍💼',
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15]
+                })
+            }).addTo(map);
+
+            patientMarker = L.marker([patientLocation.lat, patientLocation.lng], {
+                icon: L.divIcon({
+                    className: 'patient-marker',
+                    html: '🏠',
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15]
+                })
+            }).addTo(map);
+
+            // Add popups
+            nurseMarker.bindPopup('Nurse Location');
+            supervisorMarker.bindPopup('Supervisor Location');
+            patientMarker.bindPopup('Patient Location');
+        }
+
+        function updateNurseLocation(lat, lng) {
+            nurseLocation = { lat, lng };
+            
+            // Update marker
+            nurseMarker.setLatLng([lat, lng]);
+            
+            // Update UI
+            document.getElementById('nurseLat').textContent = lat.toFixed(6);
+            document.getElementById('nurseLng').textContent = lng.toFixed(6);
+            document.getElementById('nurseLastUpdate').textContent = new Date().toLocaleTimeString();
+            
+            // Calculate distances
+            calculateDistances(lat, lng);
+        }
+
+        function calculateDistances(lat, lng) {
+            // Simple distance calculation using Haversine formula
+            function haversineDistance(lat1, lon1, lat2, lon2) {
+                const R = 6371; // Earth's radius in km
+                const dLat = (lat2 - lat1) * Math.PI / 180;
+                const dLon = (lon2 - lon1) * Math.PI / 180;
+                const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                         Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                         Math.sin(dLon/2) * Math.sin(dLon/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                return R * c;
+            }
+
+            // Calculate distances
+            const distanceToPatient = haversineDistance(lat, lng, patientLocation.lat, patientLocation.lng);
+            const distanceToSupervisor = haversineDistance(lat, lng, supervisorLocation.lat, supervisorLocation.lng);
+            
+            // Update nurse panel
+            document.getElementById('distanceToPatient').textContent = `${distanceToPatient.toFixed(2)} km`;
+            document.getElementById('distanceToSupervisor').textContent = `${distanceToSupervisor.toFixed(2)} km`;
+            
+            // Update supervisor panel
+            document.getElementById('supervisorDistanceToPatient').textContent = `${distanceToPatient.toFixed(2)} km`;
+            document.getElementById('supervisorDistanceToSupervisor').textContent = `${distanceToSupervisor.toFixed(2)} km`;
+            
+            // Calculate travel time (rough estimate: 30 km/h average)
+            const travelTime = Math.round(distanceToPatient / 30 * 60);
+            document.getElementById('travelTime').textContent = `${travelTime} min`;
+            
+            // Calculate ETA
+            const eta = new Date(Date.now() + travelTime * 60 * 1000);
+            document.getElementById('eta').textContent = eta.toLocaleTimeString();
+        }
+
+        function startSimulation() {
+            if (isSimulating) return;
+            
+            isSimulating = true;
+            document.getElementById('startSimulation').disabled = true;
+            document.getElementById('stopSimulation').disabled = false;
+            
+            simulationInterval = setInterval(() => {
+                // Simulate movement by adding small random changes
+                const latChange = (Math.random() - 0.5) * 0.001;
+                const lngChange = (Math.random() - 0.5) * 0.001;
+                
+                const newLat = nurseLocation.lat + latChange;
+                const newLng = nurseLocation.lng + lngChange;
+                
+                // Update simulation inputs
+                document.getElementById('simLat').value = newLat.toFixed(6);
+                document.getElementById('simLng').value = newLng.toFixed(6);
+                
+                updateNurseLocation(newLat, newLng);
+            }, 3000); // Update every 3 seconds
+        }
+
+        function stopSimulation() {
+            if (!isSimulating) return;
+            
+            isSimulating = false;
+            clearInterval(simulationInterval);
+            document.getElementById('startSimulation').disabled = false;
+            document.getElementById('stopSimulation').disabled = true;
+        }
+
+        // Event listeners
+        document.getElementById('updateLocation').addEventListener('click', () => {
+            const lat = parseFloat(document.getElementById('simLat').value);
+            const lng = parseFloat(document.getElementById('simLng').value);
+            updateNurseLocation(lat, lng);
+        });
+
+        document.getElementById('startSimulation').addEventListener('click', startSimulation);
+        document.getElementById('stopSimulation').addEventListener('click', stopSimulation);
+
+        document.getElementById('updatePatient').addEventListener('click', () => {
+            const address = document.getElementById('patientAddress').value;
+            if (address) {
+                patientLocation.address = address;
+                document.getElementById('supervisorPatientAddress').textContent = address;
+                
+                // For demo purposes, use a fixed location near the nurse
+                patientLocation.lat = nurseLocation.lat + 0.01;
+                patientLocation.lng = nurseLocation.lng + 0.01;
+                
+                patientMarker.setLatLng([patientLocation.lat, patientLocation.lng]);
+                document.getElementById('supervisorPatientCoords').textContent = 
+                    `${patientLocation.lat.toFixed(4)}, ${patientLocation.lng.toFixed(4)}`;
+                
+                calculateDistances(nurseLocation.lat, nurseLocation.lng);
+            }
+        });
+
+        // Initialize when page loads
+        window.addEventListener('load', () => {
+            initMap();
+            calculateDistances(nurseLocation.lat, nurseLocation.lng);
+        });
+    </script>
+</body>
+</html> 

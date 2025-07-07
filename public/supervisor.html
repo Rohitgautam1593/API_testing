@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supervisor Dashboard</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .map-container {
+            flex: 2;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .sidebar {
+            flex: 1;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        #map {
+            height: 500px;
+            width: 100%;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        .location-info {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .distance-info {
+            background-color: #fff3cd;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        h1, h3 {
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+        
+        <div class="sidebar">
+            <h1>👨‍💼 Supervisor Dashboard</h1>
+            
+            <div id="status" class="status info">
+                Connecting to server...
+            </div>
+            
+            <div class="location-info">
+                <h3>Nurse Location:</h3>
+                <p><strong>Latitude:</strong> <span id="nurseLat">--</span></p>
+                <p><strong>Longitude:</strong> <span id="nurseLon">--</span></p>
+                <p><strong>Last Update:</strong> <span id="lastUpdate">--</span></p>
+                <p><strong>Update Count:</strong> <span id="updateCount">0</span></p>
+            </div>
+            
+            <div class="distance-info">
+                <h3>Distance Calculations:</h3>
+                <p><strong>Nurse → Patient:</strong> <span id="distanceToPatient">--</span></p>
+                <p><strong>Nurse → Supervisor:</strong> <span id="distanceToSupervisor">--</span></p>
+            </div>
+            
+            <div class="location-info">
+                <h3>Fixed Locations:</h3>
+                <p><strong>Supervisor:</strong> <span id="supervisorLocation">SRHU, Dehradun (30.3165, 78.0322)</span></p>
+                <p><strong>Patient:</strong> <span id="patientLocation">Rishikesh (30.0869, 78.2676)</span></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let map, nurseMarker, supervisorMarker, patientMarker;
+        let updateCount = 0;
+        let locationInterval = null;
+        
+        // Fixed locations
+        const supervisorCoords = [30.3165, 78.0322]; // SRHU, Dehradun
+        const patientCoords = [30.0869, 78.2676]; // Rishikesh
+        
+        const statusDiv = document.getElementById('status');
+        
+        function updateStatus(message, type = 'info') {
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+        }
+        
+        function haversineDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Earth's radius in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                     Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+        
+        let routeLine = null;
+        
+        function calculateDistances(nurseLat, nurseLon) {
+            const distanceToPatient = haversineDistance(nurseLat, nurseLon, patientCoords[0], patientCoords[1]);
+            const distanceToSupervisor = haversineDistance(nurseLat, nurseLon, supervisorCoords[0], supervisorCoords[1]);
+            
+            document.getElementById('distanceToPatient').textContent = `${distanceToPatient.toFixed(2)} km`;
+            document.getElementById('distanceToSupervisor').textContent = `${distanceToSupervisor.toFixed(2)} km`;
+        }
+        
+        async function updateRouteToPatient(nurseLat, nurseLon) {
+            try {
+                // Remove existing route line
+                if (routeLine) {
+                    map.removeLayer(routeLine);
+                }
+                
+                // Get road route
+                const response = await fetch(`/api/route?from_lat=${nurseLat}&from_lng=${nurseLon}&to_lat=${patientCoords[0]}&to_lng=${patientCoords[1]}`);
+                const routeData = await response.json();
+                
+                if (routeData.geometry && routeData.geometry.coordinates) {
+                    // Convert coordinates to [lat, lng] format for Leaflet
+                    const pathCoordinates = routeData.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+                    
+                    routeLine = L.polyline(pathCoordinates, {
+                        color: '#00ff00',
+                        weight: 6,
+                        opacity: 0.8,
+                        dashArray: '10, 10'
+                    }).addTo(map);
+                    
+                    // Add glow effect
+                    const pathElement = routeLine.getElement();
+                    if (pathElement) {
+                        pathElement.style.filter = 'drop-shadow(0 0 8px #00ff00)';
+                    }
+                    
+                    // Update distance with road distance
+                    const roadDistance = (routeData.distance / 1000).toFixed(2);
+                    document.getElementById('distanceToPatient').textContent = `${roadDistance} km (Road)`;
+                }
+            } catch (error) {
+                console.error('Error fetching route:', error);
+                // Fallback to straight line
+                if (routeLine) {
+                    map.removeLayer(routeLine);
+                }
+                routeLine = L.polyline([
+                    [nurseLat, nurseLon],
+                    [patientCoords[0], patientCoords[1]]
+                ], {
+                    color: '#ff6b6b',
+                    weight: 4,
+                    opacity: 0.6,
+                    dashArray: '5, 5'
+                }).addTo(map);
+            }
+        }
+        
+        function updateNurseLocation(location) {
+            updateCount++;
+            document.getElementById('updateCount').textContent = updateCount;
+            document.getElementById('nurseLat').textContent = location.lat.toFixed(6);
+            document.getElementById('nurseLon').textContent = location.lon.toFixed(6);
+            document.getElementById('lastUpdate').textContent = new Date(location.timestamp).toLocaleTimeString();
+            
+            // Update marker on map
+            if (nurseMarker) {
+                nurseMarker.setLatLng([location.lat, location.lon]);
+            } else {
+                nurseMarker = L.marker([location.lat, location.lon], {
+                    icon: L.divIcon({
+                        className: 'nurse-marker',
+                        html: '👩‍⚕️',
+                        iconSize: [30, 30],
+                        iconAnchor: [15, 15]
+                    })
+                }).addTo(map);
+                nurseMarker.bindPopup('Nurse Location');
+            }
+            
+            // Calculate distances and show route
+            calculateDistances(location.lat, location.lon);
+            updateRouteToPatient(location.lat, location.lon);
+            
+            // Center map on nurse location
+            map.setView([location.lat, location.lon], 12);
+            
+            updateStatus(`Nurse location updated! (${updateCount} updates)`, 'success');
+        }
+        
+        function fetchNurseLocation() {
+            fetch('/get-location')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(location => {
+                    updateNurseLocation(location);
+                })
+                .catch(error => {
+                    updateStatus(`Error fetching location: ${error.message}`, 'error');
+                });
+        }
+        
+        function startLocationUpdates() {
+            // Fetch location immediately
+            fetchNurseLocation();
+            
+            // Then fetch every 5 seconds
+            locationInterval = setInterval(fetchNurseLocation, 5000);
+        }
+        
+        function initMap() {
+            // Initialize map centered on supervisor location
+            map = L.map('map').setView(supervisorCoords, 10);
+            
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 18
+            }).addTo(map);
+            
+            // Add supervisor marker
+            supervisorMarker = L.marker(supervisorCoords, {
+                icon: L.divIcon({
+                    className: 'supervisor-marker',
+                    html: '👨‍💼',
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15]
+                })
+            }).addTo(map);
+            supervisorMarker.bindPopup('Supervisor Location (SRHU, Dehradun)');
+            
+            // Add patient marker
+            patientMarker = L.marker(patientCoords, {
+                icon: L.divIcon({
+                    className: 'patient-marker',
+                    html: '🏠',
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15]
+                })
+            }).addTo(map);
+            patientMarker.bindPopup('Patient Location (Rishikesh)');
+        }
+        
+        // Initialize
+        initMap();
+        updateStatus('Dashboard ready. Waiting for nurse location updates...', 'info');
+        startLocationUpdates();
+    </script>
+</body>
+</html> 

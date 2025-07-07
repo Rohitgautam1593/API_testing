@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nurse Tracking System - Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        h1 {
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        .buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 15px 30px;
+            font-size: 18px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            text-decoration: none;
+            color: white;
+            transition: transform 0.3s ease;
+        }
+        .btn:hover {
+            transform: translateY(-3px);
+        }
+        .btn-nurse {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+        }
+        .btn-supervisor {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+        }
+        .info {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏥 Nurse Tracking System</h1>
+        <p style="font-size: 18px; margin-bottom: 30px;">Real-time location tracking with LocationIQ API</p>
+        
+        <div class="buttons">
+            <a href="/nurse" class="btn btn-nurse">👩‍⚕️ Nurse Interface</a>
+            <a href="/supervisor" class="btn btn-supervisor">👨‍💼 Supervisor Dashboard</a>
+        </div>
+        
+        <div class="info">
+            <h3>Test Instructions:</h3>
+            <ul style="text-align: left; max-width: 500px; margin: 0 auto;">
+                <li>Open <strong>Nurse Interface</strong> on your mobile device</li>
+                <li>Allow location access to simulate GPS tracking</li>
+                <li>Open <strong>Supervisor Dashboard</strong> on your computer</li>
+                <li>Watch real-time location updates and distance calculations</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html> 

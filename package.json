@@ -1,0 +1,24 @@
+{
+  "name": "nurse-location-tracker",
+  "version": "1.0.0",
+  "description": "Simple nurse location tracking system with Node.js API and HTML frontend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "mkcert": "^1.12.0"
+  },
+  "keywords": [
+    "location",
+    "tracking",
+    "nurse",
+    "gps",
+    "express",
+    "api"
+  ],
+  "author": "",
+  "license": "MIT"
+} 
