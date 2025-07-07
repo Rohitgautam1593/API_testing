@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nurse Location Tracker</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -44,6 +46,7 @@
         }
         .btn:hover { background-color: #0056b3; }
         .btn:disabled { background-color: #6c757d; cursor: not-allowed; }
+        #map { height: 300px; width: 100%; margin-top: 20px; border-radius: 10px; }
     </style>
 </head>
 <body>
@@ -62,6 +65,11 @@
             <p><strong>Last Update:</strong> <span id="lastUpdate">--</span></p>
         </div>
         
+        <div class="location-info">
+            <label for="nurseId"><strong>Nurse ID:</strong></label>
+            <input type="text" id="nurseId" placeholder="Enter your name or ID" style="width: 100%; padding: 8px; margin-top: 5px; margin-bottom: 10px; border-radius: 5px; border: 1px solid #ccc;">
+        </div>
+        
         <div>
             <button id="startBtn" class="btn">Start Tracking</button>
             <button id="stopBtn" class="btn" disabled>Stop Tracking</button>
@@ -72,11 +80,15 @@
             <p><strong>Server Response:</strong> <span id="serverResponse">--</span></p>
             <p><strong>Update Count:</strong> <span id="updateCount">0</span></p>
         </div>
+        
+        <div id="map"></div>
     </div>
 
     <script>
         let trackingInterval = null;
         let updateCount = 0;
+        let map, nurseMarker, patientMarker, routeLine;
+        const patientCoords = [30.0869, 78.2676]; // Rishikesh
         
         const statusDiv = document.getElementById('status');
         const startBtn = document.getElementById('startBtn');
@@ -92,15 +104,29 @@
             document.getElementById('lon').textContent = position.coords.longitude.toFixed(6);
             document.getElementById('accuracy').textContent = Math.round(position.coords.accuracy);
             document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+            // Update map
+            if (map) {
+                const nurseLatLng = [position.coords.latitude, position.coords.longitude];
+                if (nurseMarker) {
+                    nurseMarker.setLatLng(nurseLatLng);
+                } else {
+                    nurseMarker = L.marker(nurseLatLng, {
+                        icon: L.divIcon({ className: 'nurse-marker', html: '👩‍⚕️', iconSize: [30, 30], iconAnchor: [15, 15] })
+                    }).addTo(map);
+                    nurseMarker.bindPopup('Your Location');
+                }
+                // Update route
+                updateRouteToPatient(position.coords.latitude, position.coords.longitude);
+                map.setView(nurseLatLng, 13);
+            }
         }
         
         function sendLocationToServer(lat, lon) {
+            const nurseId = document.getElementById('nurseId').value.trim() || 'default';
             fetch('/update-location', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ lat, lon })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lat, lon, nurseId })
             })
             .then(response => response.json())
             .then(data => {
@@ -118,6 +144,38 @@
                 document.getElementById('serverResponse').textContent = 'Network Error';
                 updateStatus(`Network error: ${error.message}`, 'error');
             });
+        }
+        
+        async function updateRouteToPatient(nurseLat, nurseLon) {
+            try {
+                if (routeLine) map.removeLayer(routeLine);
+                let response = await fetch(`/api/realroute?from_lat=${nurseLat}&from_lng=${nurseLon}&to_lat=${patientCoords[0]}&to_lng=${patientCoords[1]}`);
+                let routeData = await response.json();
+                if (routeData && routeData.features && routeData.features[0]) {
+                    const coords = routeData.features[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+                    routeLine = L.polyline(coords, { color: '#0074D9', weight: 6, opacity: 0.9 }).addTo(map);
+                    return;
+                }
+                throw new Error('No real route');
+            } catch (error) {
+                // fallback: straight line
+                if (routeLine) map.removeLayer(routeLine);
+                routeLine = L.polyline([
+                    [nurseLat, nurseLon],
+                    patientCoords
+                ], { color: '#ff6b6b', weight: 4, opacity: 0.6, dashArray: '5, 5' }).addTo(map);
+            }
+        }
+        
+        function initMap() {
+            map = L.map('map').setView(patientCoords, 11);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors', maxZoom: 18
+            }).addTo(map);
+            patientMarker = L.marker(patientCoords, {
+                icon: L.divIcon({ className: 'patient-marker', html: '🏠', iconSize: [30, 30], iconAnchor: [15, 15] })
+            }).addTo(map);
+            patientMarker.bindPopup('Patient Location (Rishikesh)');
         }
         
         function startTracking() {
@@ -172,6 +230,7 @@
         stopBtn.addEventListener('click', stopTracking);
         
         // Initialize
+        initMap();
         updateStatus('Ready to start location tracking. Click "Start Tracking" to begin.', 'info');
     </script>
 </body>
